@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"log"
 	"os"
 
-	"github.com/urfave/cli/v3"
+	"github.com/yaninyzwitty/aws-resource-auditor-go/cmd"
 )
 
 func main() {
-	(&cli.Command{}).Run(context.Background(), os.Args)
+	if err := cmd.NewCliCommand().Run(context.Background(), os.Args); err != nil {
+		log.Fatal(err)
+	}
 }
