@@ -1,45 +1,46 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/urfave/cli/v3"
+	"github.com/yaninyzwitty/aws-resource-auditor-go/internal/config"
+)
+
+var (
+	globalConfig config.FlagOverrides
+	Cfg          *config.Config
 )
 
 func NewCliCommand() *cli.Command {
 	return &cli.Command{
-		Name:        "audit",
-		Description: "An audit system for auditing your AWS resources",
-		Usage:       "Audit your AWS resources",
+		Name:  "aws-resource-auditor",
+		Usage: "Audit AWS resources",
 
-		// global flags
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "region",
-				Aliases: []string{"r"},
-				Usage:   "Aws target region",
-				Sources: cli.EnvVars("AWS_REGION"),
-				Value:   "us-east-1",
-			},
-			&cli.StringFlag{
-				Name:    "profile",
-				Aliases: []string{"p"},
-				Usage:   "Aws named profile",
-				Sources: cli.EnvVars("AWS_PROFILE"),
-			},
-			&cli.StringFlag{
-				Name:    "output",
-				Aliases: []string{"o"},
-				Usage:   "Output format: table, JSON, CSV, MarkDown",
-				Value:   "table",
-			},
-			&cli.BoolFlag{
-				Name:    "all-regions",
-				Usage:   "Scan all regions. If set, the --region flag will be ignored.",
-				Value:   false,
-				Sources: cli.EnvVars("ALL_REGIONS"),
-			},
+		Flags: GlobalFlags(),
+
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+
+			// load config file
+			cfg, err := config.Load(cmd.String("config"))
+			if err != nil {
+				return ctx, fmt.Errorf("config load: %w", err)
+			}
+
+			// merge CLI flags
+			cfg.MergeFlags(globalConfig)
+
+			// validate config
+			if err := cfg.Validate(); err != nil {
+				return ctx, fmt.Errorf("config validation: %w", err)
+			}
+
+			Cfg = cfg
+
+			return ctx, nil
 		},
-		Commands: []*cli.Command{
-			// commands might live here
-		},
+
+		Commands: []*cli.Command{},
 	}
 }

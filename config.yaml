@@ -1,0 +1,24 @@
+aws:
+  profile: dev
+  region: us-east-1
+
+output:
+  format: table
+
+thresholds:
+  older_than: 90d
+  cpu_threshold: 20
+
+services:
+  ec2:
+    unused_older_than: 30d
+    cpu_threshold: 10
+
+  iam:
+    stale_keys_older_than: 90d
+
+tags:
+  required:
+    - Name
+    - Env
+    - Owner
