@@ -163,8 +163,9 @@ func GlobalFlags() []cli.Flag {
 
 		// TAG FILTER
 		&cli.StringSliceFlag{
-			Name:  "tags",
-			Usage: "filter tags e.g. --tags Name=witty",
+			Name:        "tags",
+			Usage:       "filter tags e.g. --tags Name=witty",
+			Destination: &globalConfig.Tags,
 		},
 	}
 }

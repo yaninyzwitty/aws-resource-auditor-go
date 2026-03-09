@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type FlagOverrides struct {
 	Profile    string
@@ -15,6 +18,7 @@ type FlagOverrides struct {
 	Quiet   bool
 
 	Severity string
+	Tags     []string
 
 	OlderThan    time.Duration
 	Days         int
@@ -67,6 +71,18 @@ func (c *Config) MergeFlags(f FlagOverrides) {
 
 	if f.Severity != "" {
 		c.Filter.Severity = f.Severity
+	}
+
+	if len(f.Tags) > 0 {
+		c.Filter.Tags = make(map[string]string, len(f.Tags))
+		for _, tag := range f.Tags {
+			// Parse "key=value" format
+			if idx := strings.Index(tag, "="); idx > 0 {
+				key := tag[:idx]
+				value := tag[idx+1:]
+				c.Filter.Tags[key] = value
+			}
+		}
 	}
 
 	if f.OlderThan != 0 {
