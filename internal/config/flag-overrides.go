@@ -74,9 +74,7 @@ func (c *Config) MergeFlags(f FlagOverrides) {
 	}
 
 	if len(f.Tags) > 0 {
-		if c.Filter.Tags == nil {
-			c.Filter.Tags = make(map[string]string)
-		}
+		c.Filter.Tags = make(map[string]string, len(f.Tags))
 		for _, tag := range f.Tags {
 			// Parse "key=value" format
 			if idx := strings.Index(tag, "="); idx > 0 {
