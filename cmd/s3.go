@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -32,6 +33,11 @@ func S3Command() *cli.Command {
 }
 
 func s3Action(ctx context.Context, cmd *cli.Command) error {
+	cfg, err := ConfigFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("getting config: %w", err)
+	}
+
 	loader, err := AwsLoaderFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("getting AWS loader: %w", err)
@@ -52,37 +58,81 @@ func s3Action(ctx context.Context, cmd *cli.Command) error {
 		versioning = true
 	}
 
+	regions := []string{cfg.AWS.Region}
+	if cfg.AWS.AllRegions {
+		regions, err = loader.Regions(ctx)
+		if err != nil {
+			return fmt.Errorf("getting regions: %w", err)
+		}
+	}
+
 	var results []string
 
-	paginator := s3.NewListBucketsPaginator(s3Client, &s3.ListBucketsInput{})
-
-	for paginator.HasMorePages() {
-		output, err := paginator.NextPage(ctx)
-		if err != nil {
-			return fmt.Errorf("listing buckets: %w", err)
+	for _, region := range regions {
+		if cfg.AWS.AllRegions {
+			fmt.Printf("Checking region: %s\n", region)
 		}
 
-		for _, bucket := range output.Buckets {
-			bucketName := *bucket.Name
+		var client *s3.Client
+		if cfg.AWS.AllRegions {
+			client, err = loader.S3InRegion(ctx, region)
+			if err != nil {
+				fmt.Printf("Error creating S3 client for region %s: %v\n", region, err)
+				continue
+			}
+		} else {
+			client = s3Client
+		}
 
-			if public {
-				isPublic, err := checkBucketPublic(ctx, s3Client, bucketName)
-				if err == nil && isPublic {
-					results = append(results, fmt.Sprintf("  Bucket: %s - PUBLIC", bucketName))
-				}
+		paginator := s3.NewListBucketsPaginator(client, &s3.ListBucketsInput{})
+
+		for paginator.HasMorePages() {
+			output, err := paginator.NextPage(ctx)
+			if err != nil {
+				fmt.Printf("Error listing buckets in region %s: %v\n", region, err)
+				continue
 			}
 
-			if unencrypted {
-				hasEncryption, err := checkBucketEncryption(ctx, s3Client, bucketName)
-				if err == nil && !hasEncryption {
-					results = append(results, fmt.Sprintf("  Bucket: %s - UNENCRYPTED", bucketName))
-				}
-			}
+			for _, bucket := range output.Buckets {
+				bucketName := *bucket.Name
 
-			if versioning {
-				versioningEnabled, err := checkBucketVersioning(ctx, s3Client, bucketName)
-				if err == nil && !versioningEnabled {
-					results = append(results, fmt.Sprintf("  Bucket: %s - VERSIONING DISABLED", bucketName))
+				if public {
+					isPublic, pubErr := checkBucketPublic(ctx, client, bucketName)
+					if pubErr != nil {
+						if isAccessDenied(pubErr) {
+							fmt.Printf("  Warning: Cannot check public access for %s: access denied\n", bucketName)
+						}
+						continue
+					}
+					if isPublic {
+						results = append(results, fmt.Sprintf("  Bucket: %s - PUBLIC", bucketName))
+					}
+				}
+
+				if unencrypted {
+					isUnencrypted, encErr := checkBucketEncryption(ctx, client, bucketName)
+					if encErr != nil {
+						if isAccessDenied(encErr) {
+							fmt.Printf("  Warning: Cannot check encryption for %s: access denied\n", bucketName)
+						}
+						continue
+					}
+					if isUnencrypted {
+						results = append(results, fmt.Sprintf("  Bucket: %s - UNENCRYPTED", bucketName))
+					}
+				}
+
+				if versioning {
+					versioningDisabled, verErr := checkBucketVersioning(ctx, client, bucketName)
+					if verErr != nil {
+						if isAccessDenied(verErr) {
+							fmt.Printf("  Warning: Cannot check versioning for %s: access denied\n", bucketName)
+						}
+						continue
+					}
+					if versioningDisabled {
+						results = append(results, fmt.Sprintf("  Bucket: %s - VERSIONING DISABLED", bucketName))
+					}
 				}
 			}
 		}
@@ -125,9 +175,14 @@ func checkBucketEncryption(ctx context.Context, client *s3.Client, bucketName st
 		Bucket: aws.String(bucketName),
 	})
 	if err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "ServerSideEncryptionConfigurationNotFound") ||
+			strings.Contains(errStr, "The server side encryption configuration was not found") {
+			return true, nil
+		}
 		return false, err
 	}
-	return true, nil
+	return false, nil
 }
 
 func checkBucketVersioning(ctx context.Context, client *s3.Client, bucketName string) (bool, error) {
@@ -138,5 +193,10 @@ func checkBucketVersioning(ctx context.Context, client *s3.Client, bucketName st
 		return false, err
 	}
 
-	return string(output.Status) == "Enabled", nil
+	return string(output.Status) != "Enabled", nil
+}
+
+func isAccessDenied(err error) bool {
+	return strings.Contains(err.Error(), "AccessDenied") ||
+		strings.Contains(err.Error(), "access denied")
 }

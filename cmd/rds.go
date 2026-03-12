@@ -32,6 +32,11 @@ func RDSCommand() *cli.Command {
 }
 
 func rdsAction(ctx context.Context, cmd *cli.Command) error {
+	cfg, err := ConfigFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("getting config: %w", err)
+	}
+
 	loader, err := AwsLoaderFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("getting AWS loader: %w", err)
@@ -40,6 +45,14 @@ func rdsAction(ctx context.Context, cmd *cli.Command) error {
 	rdsClient, err := loader.RDS(ctx)
 	if err != nil {
 		return fmt.Errorf("creating RDS client: %w", err)
+	}
+
+	regions := []string{cfg.AWS.Region}
+	if cfg.AWS.AllRegions {
+		regions, err = loader.Regions(ctx)
+		if err != nil {
+			return fmt.Errorf("getting regions: %w", err)
+		}
 	}
 
 	idle := cmd.Bool("idle")
@@ -52,7 +65,6 @@ func rdsAction(ctx context.Context, cmd *cli.Command) error {
 		public = true
 	}
 
-	cfg, _ := ConfigFromContext(ctx)
 	idleDays := cfg.Services.RDS.IdleDays
 	if idleDays == 0 {
 		idleDays = 30
@@ -60,28 +72,45 @@ func rdsAction(ctx context.Context, cmd *cli.Command) error {
 
 	var results []string
 
-	if idle {
-		instances, err := findIdleInstances(ctx, rdsClient, idleDays)
-		if err != nil {
-			fmt.Printf("Error finding idle instances: %v\n", err)
+	for _, region := range regions {
+		if cfg.AWS.AllRegions {
+			fmt.Printf("Checking region: %s\n", region)
 		}
-		results = append(results, instances...)
-	}
 
-	if unencrypted {
-		instances, err := findUnencryptedRDS(ctx, rdsClient)
-		if err != nil {
-			fmt.Printf("Error finding unencrypted instances: %v\n", err)
+		var client *rds.Client
+		if cfg.AWS.AllRegions {
+			client, err = loader.RDSInRegion(ctx, region)
+			if err != nil {
+				fmt.Printf("Error creating RDS client for region %s: %v\n", region, err)
+				continue
+			}
+		} else {
+			client = rdsClient
 		}
-		results = append(results, instances...)
-	}
 
-	if public {
-		instances, err := findPublicRDS(ctx, rdsClient)
-		if err != nil {
-			fmt.Printf("Error finding public instances: %v\n", err)
+		if idle {
+			instances, err := findIdleInstances(ctx, client, idleDays)
+			if err != nil {
+				fmt.Printf("Error finding idle instances: %v\n", err)
+			}
+			results = append(results, instances...)
 		}
-		results = append(results, instances...)
+
+		if unencrypted {
+			instances, err := findUnencryptedRDS(ctx, client)
+			if err != nil {
+				fmt.Printf("Error finding unencrypted instances: %v\n", err)
+			}
+			results = append(results, instances...)
+		}
+
+		if public {
+			instances, err := findPublicRDS(ctx, client)
+			if err != nil {
+				fmt.Printf("Error finding public instances: %v\n", err)
+			}
+			results = append(results, instances...)
+		}
 	}
 
 	if len(results) == 0 {

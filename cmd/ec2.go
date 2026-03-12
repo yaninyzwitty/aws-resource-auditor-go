@@ -74,12 +74,15 @@ func ec2Action(ctx context.Context, cmd *cli.Command) error {
 			fmt.Printf("Checking region: %s\n", region)
 		}
 
-		client := ec2Client
+		var client *ec2.Client
 		if cfg.AWS.AllRegions {
-			client, err = loader.EC2(ctx)
+			client, err = loader.EC2InRegion(ctx, region)
 			if err != nil {
+				fmt.Printf("Error creating EC2 client for region %s: %v\n", region, err)
 				continue
 			}
+		} else {
+			client = ec2Client
 		}
 
 		if unused {
@@ -148,7 +151,7 @@ func findUnusedInstances(ctx context.Context, client *ec2.Client, olderThan time
 
 				var name string
 				for _, tag := range instance.Tags {
-					if tag.Key != nil && *tag.Key == "Name" {
+					if tag.Key != nil && *tag.Key == "Name" && tag.Value != nil {
 						name = *tag.Value
 						break
 					}
@@ -199,9 +202,14 @@ func findOldAMIs(ctx context.Context, client *ec2.Client, olderThan time.Duratio
 				continue
 			}
 
+			imageName := ""
+			if image.Name != nil {
+				imageName = *image.Name
+			}
+
 			result := fmt.Sprintf("  AMI: %s (%s) - Created: %s ago",
 				*image.ImageId,
-				*image.Name,
+				imageName,
 				formatDuration(age),
 			)
 			results = append(results, result)

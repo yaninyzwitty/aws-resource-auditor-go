@@ -10,6 +10,10 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+const (
+	LAMBDA_LAST_MODIFIED string = "2006-01-02T15:04:05.000-0700"
+)
+
 func LambdaCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "lambda",
@@ -29,6 +33,11 @@ func LambdaCommand() *cli.Command {
 }
 
 func lambdaAction(ctx context.Context, cmd *cli.Command) error {
+	cfg, err := ConfigFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("getting config: %w", err)
+	}
+
 	loader, err := AwsLoaderFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("getting AWS loader: %w", err)
@@ -39,6 +48,14 @@ func lambdaAction(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("creating Lambda client: %w", err)
 	}
 
+	regions := []string{cfg.AWS.Region}
+	if cfg.AWS.AllRegions {
+		regions, err = loader.Regions(ctx)
+		if err != nil {
+			return fmt.Errorf("getting regions: %w", err)
+		}
+	}
+
 	oldFunctions := cmd.Bool("old-functions")
 	outdatedRuntime := cmd.Bool("outdated-runtime")
 
@@ -47,7 +64,6 @@ func lambdaAction(ctx context.Context, cmd *cli.Command) error {
 		outdatedRuntime = true
 	}
 
-	cfg, _ := ConfigFromContext(ctx)
 	olderThan := cfg.Thresholds.OlderThan
 	if olderThan == 0 {
 		olderThan = 90 * 24 * time.Hour
@@ -55,20 +71,37 @@ func lambdaAction(ctx context.Context, cmd *cli.Command) error {
 
 	var results []string
 
-	if oldFunctions {
-		functions, err := findOldFunctions(ctx, lambdaClient, olderThan)
-		if err != nil {
-			fmt.Printf("Error finding old functions: %v\n", err)
+	for _, region := range regions {
+		if cfg.AWS.AllRegions {
+			fmt.Printf("Checking region: %s\n", region)
 		}
-		results = append(results, functions...)
-	}
 
-	if outdatedRuntime {
-		functions, err := findOutdatedRuntimes(ctx, lambdaClient)
-		if err != nil {
-			fmt.Printf("Error finding outdated runtimes: %v\n", err)
+		var client *lambda.Client
+		if cfg.AWS.AllRegions {
+			client, err = loader.LambdaInRegion(ctx, region)
+			if err != nil {
+				fmt.Printf("Error creating Lambda client for region %s: %v\n", region, err)
+				continue
+			}
+		} else {
+			client = lambdaClient
 		}
-		results = append(results, functions...)
+
+		if oldFunctions {
+			functions, err := findOldFunctions(ctx, client, olderThan)
+			if err != nil {
+				fmt.Printf("Error finding old functions: %v\n", err)
+			}
+			results = append(results, functions...)
+		}
+
+		if outdatedRuntime {
+			functions, err := findOutdatedRuntimes(ctx, client)
+			if err != nil {
+				fmt.Printf("Error finding outdated runtimes: %v\n", err)
+			}
+			results = append(results, functions...)
+		}
 	}
 
 	if len(results) == 0 {
@@ -100,13 +133,17 @@ func findOldFunctions(ctx context.Context, client *lambda.Client, olderThan time
 				continue
 			}
 
-			lastModified, err := time.Parse(time.RFC3339, *function.LastModified)
+			lastModified, err := time.Parse(LAMBDA_LAST_MODIFIED, *function.LastModified)
 			if err != nil {
 				continue
 			}
 
 			age := time.Since(lastModified)
 			if age < olderThan {
+				continue
+			}
+
+			if function.FunctionName == nil {
 				continue
 			}
 

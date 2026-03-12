@@ -149,7 +149,11 @@ func findUnusedRoles(ctx context.Context, client *iam.Client, olderThan time.Dur
 
 		for _, role := range output.Roles {
 			if role.RoleLastUsed == nil || role.RoleLastUsed.LastUsedDate == nil {
-				age := time.Since(*role.CreateDate)
+				roleCreateDate := time.Time{}
+				if role.CreateDate != nil {
+					roleCreateDate = *role.CreateDate
+				}
+				age := time.Since(roleCreateDate)
 				result := fmt.Sprintf("  Role: %s - NEVER USED - Created: %s ago",
 					*role.RoleName,
 					formatDuration(age),
@@ -177,7 +181,8 @@ func findUnusedRoles(ctx context.Context, client *iam.Client, olderThan time.Dur
 func checkPasswordPolicy(ctx context.Context, client *iam.Client) (string, error) {
 	output, err := client.GetAccountPasswordPolicy(ctx, &iam.GetAccountPasswordPolicyInput{})
 	if err != nil {
-		return "", nil
+		// NoSuchEntity error typically means no custom policy is set
+		return "  Password Policy Issues:\n    - No custom password policy configured (using AWS defaults)", nil
 	}
 
 	policy := output.PasswordPolicy

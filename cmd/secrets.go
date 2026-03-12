@@ -35,7 +35,7 @@ func secretsAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	unrotated := cmd.Bool("unrotated")
-
+	// default to all checks when no flags specified
 	if !unrotated {
 		unrotated = true
 	}
@@ -83,6 +83,10 @@ func findUnrotatedSecrets(ctx context.Context, client *secretsmanager.Client, ol
 		for _, secret := range output.SecretList {
 			if secret.LastRotatedDate == nil {
 				if secret.CreatedDate == nil {
+					continue
+				}
+
+				if secret.Name == nil {
 					continue
 				}
 				age := time.Since(*secret.CreatedDate)
