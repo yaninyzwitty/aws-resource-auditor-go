@@ -46,6 +46,10 @@ func (l *Loader) loadConfig(ctx context.Context) error {
 	l.configOnce.Do(func() {
 		var opts []func(*config.LoadOptions) error
 
+		if l.cfg.Region != "" {
+			opts = append(opts, config.WithRegion(l.cfg.Region))
+		}
+
 		if l.cfg.Profile != "" {
 			opts = append(opts, config.WithSharedConfigProfile(l.cfg.Profile))
 		}

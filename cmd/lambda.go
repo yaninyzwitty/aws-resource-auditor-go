@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/urfave/cli/v3"
 )
@@ -188,6 +187,9 @@ func findOutdatedRuntimes(ctx context.Context, client *lambda.Client) ([]string,
 
 		for _, function := range output.Functions {
 			if outdatedRuntimes[string(function.Runtime)] {
+				if function.FunctionName == nil {
+					continue
+				}
 				result := fmt.Sprintf("  Function: %s - Runtime: %s (OUTDATED)",
 					*function.FunctionName,
 					function.Runtime,
@@ -198,19 +200,4 @@ func findOutdatedRuntimes(ctx context.Context, client *lambda.Client) ([]string,
 	}
 
 	return results, nil
-}
-
-func getFunctionInvocations(ctx context.Context, client *lambda.Client, functionName string) (int64, error) {
-	output, err := client.GetFunction(ctx, &lambda.GetFunctionInput{
-		FunctionName: aws.String(functionName),
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	if output.Configuration == nil || output.Configuration.RevisionId == nil {
-		return 0, nil
-	}
-
-	return 0, nil
 }

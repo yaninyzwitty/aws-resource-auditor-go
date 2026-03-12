@@ -85,12 +85,11 @@ func findUnrotatedSecrets(ctx context.Context, client *secretsmanager.Client, ol
 				if secret.CreatedDate == nil {
 					continue
 				}
-
-				if secret.Name == nil {
-					continue
-				}
 				age := time.Since(*secret.CreatedDate)
 				if age >= olderThan {
+					if secret.Name == nil {
+						continue
+					}
 					result := fmt.Sprintf("  Secret: %s - NEVER ROTATED - Created: %s ago",
 						*secret.Name,
 						formatDuration(age),
