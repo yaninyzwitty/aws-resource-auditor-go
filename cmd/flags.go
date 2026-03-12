@@ -4,7 +4,10 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v3"
+	"github.com/yaninyzwitty/aws-resource-auditor-go/internal/config"
 )
+
+var globalConfig config.FlagOverrides
 
 func GlobalFlags() []cli.Flag {
 	return []cli.Flag{
