@@ -42,11 +42,10 @@ func NewLoader(cfg awsconfigpkg.AWSConfig) (*Loader, error) {
 	return &Loader{cfg: cfg}, nil
 }
 
-func (l *Loader) initConfig(ctx context.Context) error {
+func (l *Loader) loadConfig(ctx context.Context) error {
 	l.configOnce.Do(func() {
 		var opts []func(*config.LoadOptions) error
 
-		// Only set region if explicitly provided - let SDK resolve from env/profile otherwise
 		if l.cfg.Region != "" {
 			opts = append(opts, config.WithRegion(l.cfg.Region))
 		}
@@ -71,12 +70,6 @@ func (l *Loader) initConfig(ctx context.Context) error {
 			cfg.Credentials = aws.NewCredentialsCache(provider)
 		}
 
-		// Validate that region was resolved (unless AllRegions is set, we need a starting region)
-		if cfg.Region == "" && !l.cfg.AllRegions {
-			l.configErr = fmt.Errorf("region not specified: set AWS_REGION, provide region in config, or use a profile with region")
-			return
-		}
-
 		l.awsCfg = cfg
 	})
 
@@ -84,14 +77,45 @@ func (l *Loader) initConfig(ctx context.Context) error {
 }
 
 func (l *Loader) Config(ctx context.Context) (aws.Config, error) {
-	if err := l.initConfig(ctx); err != nil {
+	if err := l.loadConfig(ctx); err != nil {
 		return aws.Config{}, err
 	}
 	return l.awsCfg, nil
 }
 
+func (l *Loader) ConfigForRegion(ctx context.Context, region string) (aws.Config, error) {
+	if err := l.loadConfig(ctx); err != nil {
+		return aws.Config{}, err
+	}
+
+	opts := []func(*config.LoadOptions) error{
+		config.WithRegion(region),
+	}
+
+	if l.cfg.Profile != "" {
+		opts = append(opts, config.WithSharedConfigProfile(l.cfg.Profile))
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return aws.Config{}, fmt.Errorf("loading AWS config for region %s: %w", region, err)
+	}
+
+	if l.cfg.RoleARN != "" {
+		provider := stscreds.NewAssumeRoleProvider(
+			sts.NewFromConfig(cfg), l.cfg.RoleARN, func(aro *stscreds.AssumeRoleOptions) {
+				if l.cfg.ExternalID != "" {
+					aro.ExternalID = &l.cfg.ExternalID
+				}
+			})
+		cfg.Credentials = aws.NewCredentialsCache(provider)
+	}
+
+	return cfg, nil
+}
+
 func (l *Loader) EC2(ctx context.Context) (*ec2.Client, error) {
-	if err := l.initConfig(ctx); err != nil {
+	if err := l.loadConfig(ctx); err != nil {
 		return nil, fmt.Errorf("creating EC2 client: %w", err)
 	}
 
@@ -102,8 +126,16 @@ func (l *Loader) EC2(ctx context.Context) (*ec2.Client, error) {
 	return l.ec2Client, nil
 }
 
+func (l *Loader) EC2InRegion(ctx context.Context, region string) (*ec2.Client, error) {
+	cfg, err := l.ConfigForRegion(ctx, region)
+	if err != nil {
+		return nil, fmt.Errorf("creating EC2 client for region %s: %w", region, err)
+	}
+	return ec2.NewFromConfig(cfg), nil
+}
+
 func (l *Loader) S3(ctx context.Context) (*s3.Client, error) {
-	if err := l.initConfig(ctx); err != nil {
+	if err := l.loadConfig(ctx); err != nil {
 		return nil, fmt.Errorf("creating S3 client: %w", err)
 	}
 
@@ -114,8 +146,16 @@ func (l *Loader) S3(ctx context.Context) (*s3.Client, error) {
 	return l.s3Client, nil
 }
 
+func (l *Loader) S3InRegion(ctx context.Context, region string) (*s3.Client, error) {
+	cfg, err := l.ConfigForRegion(ctx, region)
+	if err != nil {
+		return nil, fmt.Errorf("creating S3 client for region %s: %w", region, err)
+	}
+	return s3.NewFromConfig(cfg), nil
+}
+
 func (l *Loader) IAM(ctx context.Context) (*iam.Client, error) {
-	if err := l.initConfig(ctx); err != nil {
+	if err := l.loadConfig(ctx); err != nil {
 		return nil, fmt.Errorf("creating IAM client: %w", err)
 	}
 
@@ -127,7 +167,7 @@ func (l *Loader) IAM(ctx context.Context) (*iam.Client, error) {
 }
 
 func (l *Loader) Lambda(ctx context.Context) (*lambda.Client, error) {
-	if err := l.initConfig(ctx); err != nil {
+	if err := l.loadConfig(ctx); err != nil {
 		return nil, fmt.Errorf("creating Lambda client: %w", err)
 	}
 
@@ -138,8 +178,16 @@ func (l *Loader) Lambda(ctx context.Context) (*lambda.Client, error) {
 	return l.lambdaClient, nil
 }
 
+func (l *Loader) LambdaInRegion(ctx context.Context, region string) (*lambda.Client, error) {
+	cfg, err := l.ConfigForRegion(ctx, region)
+	if err != nil {
+		return nil, fmt.Errorf("creating Lambda client for region %s: %w", region, err)
+	}
+	return lambda.NewFromConfig(cfg), nil
+}
+
 func (l *Loader) RDS(ctx context.Context) (*rds.Client, error) {
-	if err := l.initConfig(ctx); err != nil {
+	if err := l.loadConfig(ctx); err != nil {
 		return nil, fmt.Errorf("creating RDS client: %w", err)
 	}
 
@@ -150,8 +198,16 @@ func (l *Loader) RDS(ctx context.Context) (*rds.Client, error) {
 	return l.rdsClient, nil
 }
 
+func (l *Loader) RDSInRegion(ctx context.Context, region string) (*rds.Client, error) {
+	cfg, err := l.ConfigForRegion(ctx, region)
+	if err != nil {
+		return nil, fmt.Errorf("creating RDS client for region %s: %w", region, err)
+	}
+	return rds.NewFromConfig(cfg), nil
+}
+
 func (l *Loader) SecretsManager(ctx context.Context) (*secretsmanager.Client, error) {
-	if err := l.initConfig(ctx); err != nil {
+	if err := l.loadConfig(ctx); err != nil {
 		return nil, fmt.Errorf("creating Secrets Manager client: %w", err)
 	}
 
@@ -173,11 +229,10 @@ func (l *Loader) Regions(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("describing regions: %w", err)
 	}
 
-	regions := make([]string, len(resp.Regions))
-	for i, r := range resp.Regions {
-		// defensive nil check - should always be set but just in case
+	regions := make([]string, 0, len(resp.Regions))
+	for _, r := range resp.Regions {
 		if r.RegionName != nil {
-			regions[i] = *r.RegionName
+			regions = append(regions, *r.RegionName)
 		}
 	}
 
