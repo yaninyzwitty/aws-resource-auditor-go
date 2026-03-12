@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	awsconfigpkg "github.com/yaninyzwitty/aws-resource-auditor-go/internal/config"
 )
 
@@ -54,19 +55,20 @@ func (l *Loader) initConfig(ctx context.Context) error {
 			opts = append(opts, config.WithSharedConfigProfile(l.cfg.Profile))
 		}
 
-		if l.cfg.RoleARN != "" {
-			opts = append(opts, config.WithAssumeRoleCredentialOptions(func(o *stscreds.AssumeRoleOptions) {
-				o.RoleARN = l.cfg.RoleARN
-				if l.cfg.ExternalID != "" {
-					o.ExternalID = &l.cfg.ExternalID
-				}
-			}))
-		}
-
 		cfg, err := config.LoadDefaultConfig(ctx, opts...)
 		if err != nil {
 			l.configErr = fmt.Errorf("loading AWS config: %w", err)
 			return
+		}
+
+		if l.cfg.RoleARN != "" {
+			provider := stscreds.NewAssumeRoleProvider(
+				sts.NewFromConfig(cfg), l.cfg.RoleARN, func(aro *stscreds.AssumeRoleOptions) {
+					if l.cfg.ExternalID != "" {
+						aro.ExternalID = &l.cfg.ExternalID
+					}
+				})
+			cfg.Credentials = aws.NewCredentialsCache(provider)
 		}
 
 		// Validate that region was resolved (unless AllRegions is set, we need a starting region)
@@ -173,7 +175,10 @@ func (l *Loader) Regions(ctx context.Context) ([]string, error) {
 
 	regions := make([]string, len(resp.Regions))
 	for i, r := range resp.Regions {
-		regions[i] = *r.RegionName
+		// defensive nil check - should always be set but just in case
+		if r.RegionName != nil {
+			regions[i] = *r.RegionName
+		}
 	}
 
 	return regions, nil
