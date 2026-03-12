@@ -22,10 +22,12 @@ Or build from source:
 ```bash
 git clone https://github.com/yaninyzwitty/aws-resource-auditor-go.git
 cd aws-resource-auditor-go
-go build -o aws-auditor .
+go build -o aws-resource-auditor .
 ```
 
 ## Configuration
+
+A `config.yaml` file is required. By default, the tool looks for `config.yaml` in the current working directory. Use `--config` to specify a custom path.
 
 Create a `config.yaml` file:
 
@@ -71,15 +73,15 @@ services:
 
 ### Global Flags
 
-| Flag | Description |
-|------|-------------|
-| `-r, --region` | AWS region |
-| `--all-regions` | Scan all AWS regions |
-| `-p, --profile` | AWS named profile |
-| `--role-arn` | IAM role ARN to assume |
-| `--config` | Path to config file |
-| `-o, --output` | Output format: table, json, csv, markdown |
-| `--older-than` | Age threshold (e.g., 90d) |
+| Flag            | Description                               |
+| --------------- | ----------------------------------------- |
+| `-r, --region`  | AWS region                                |
+| `--all-regions` | Scan all AWS regions                      |
+| `-p, --profile` | AWS named profile                         |
+| `--role-arn`    | IAM role ARN to assume                    |
+| `--config`      | Path to config file                       |
+| `-o, --output`  | Output format: table, json, csv, markdown |
+| `--older-than`  | Age threshold (e.g., 90d)                 |
 
 ### Commands
 
@@ -87,109 +89,112 @@ services:
 
 ```bash
 # Run all EC2 audits
-aws-auditor ec2
+aws-resource-auditor ec2
 
 # Find unused instances
-aws-auditor ec2 --unused
+aws-resource-auditor ec2 --unused
 
 # Find old AMIs
-aws-auditor ec2 --old-amis
+aws-resource-auditor ec2 --old-amis
 
 # Find unencrypted volumes
-aws-auditor ec2 --unencrypted
+aws-resource-auditor ec2 --unencrypted
 
 # Scan all regions
-aws-auditor ec2 --all-regions
+aws-resource-auditor ec2 --all-regions
 ```
 
 #### S3
 
 ```bash
 # Run all S3 audits
-aws-auditor s3
+aws-resource-auditor s3
 
 # Find public buckets
-aws-auditor s3 --public
+aws-resource-auditor s3 --public
 
 # Find unencrypted buckets
-aws-auditor s3 --unencrypted
+aws-resource-auditor s3 --unencrypted
 
 # Check versioning status
-aws-auditor s3 --versioning
+aws-resource-auditor s3 --versioning
 
 # Scan all regions
-aws-auditor s3 --all-regions
+aws-resource-auditor s3 --all-regions
 ```
 
 #### IAM
 
 ```bash
 # Run all IAM audits
-aws-auditor iam
+aws-resource-auditor iam
 
 # Find stale access keys
-aws-auditor iam --stale-keys
+aws-resource-auditor iam --stale-keys
 
 # Find unused roles
-aws-auditor iam --unused-roles
+aws-resource-auditor iam --unused-roles
 
 # Check password policy
-aws-auditor iam --password-policy
+aws-resource-auditor iam --password-policy
 ```
 
 #### Lambda
 
 ```bash
 # Run all Lambda audits
-aws-auditor lambda
+aws-resource-auditor lambda
 
 # Find old functions
-aws-auditor lambda --old-functions
+aws-resource-auditor lambda --old-functions
 
 # Find outdated runtimes
-aws-auditor lambda --outdated-runtime
+aws-resource-auditor lambda --outdated-runtime
 
 # Scan all regions
-aws-auditor lambda --all-regions
+aws-resource-auditor lambda --all-regions
 ```
 
 #### RDS
 
 ```bash
 # Run all RDS audits
-aws-auditor rds
+aws-resource-auditor rds
 
 # Find idle instances
-aws-auditor rds --idle
+aws-resource-auditor rds --idle
 
 # Find unencrypted instances
-aws-auditor rds --unencrypted
+aws-resource-auditor rds --unencrypted
 
 # Find publicly accessible instances
-aws-auditor rds --public
+aws-resource-auditor rds --public
 
 # Scan all regions
-aws-auditor rds --all-regions
+aws-resource-auditor rds --all-regions
 ```
 
 #### Secrets
 
 ```bash
 # Find unrotated secrets
-aws-auditor secrets --unrotated
+aws-resource-auditor secrets --unrotated
 ```
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `AWS_PROFILE` | AWS named profile |
-| `AWS_REGION` | Default AWS region |
-| `AWS_ACCESS_KEY_ID` | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
-| `AUDIT_ROLE_ARN` | IAM role to assume |
-| `AUDIT_OUTPUT` | Default output format |
-| `AUDIT_SEVERITY` | Minimum severity level |
+| Variable                | Description                          |
+| ----------------------- | ------------------------------------ |
+| `AWS_PROFILE`           | AWS named profile                    |
+| `AWS_REGION`            | Default AWS region                   |
+| `AWS_ACCESS_KEY_ID`     | AWS access key (standard SDK var)    |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key (standard SDK var)    |
+| `AUDIT_ROLE_ARN`        | IAM role to assume                   |
+| `AUDIT_OUTPUT`          | Default output format                |
+| `AUDIT_SEVERITY`        | Minimum severity level               |
+| `NO_COLOR`              | Disable ANSI color output            |
+| `AUDIT_EXPORT`          | Write results to file                |
+| `AUDIT_LOG_LEVEL`       | Log level (debug, info, warn, error) |
 
 ## Output
 
@@ -197,7 +202,7 @@ The tool outputs audit findings with resource identifiers and relevant details. 
 
 Example output:
 
-```
+```text
 Checking region: us-east-1
 Findings:
   Instance: i-0123456789abcdef0 (web-server) - State: stopped - Launched: 120d ago
