@@ -43,7 +43,7 @@ func secretsAction(ctx context.Context, cmd *cli.Command) error {
 
 	cfg, err := ConfigFromContext(ctx)
 	if err != nil {
-		return fmt.Errorf("getting config %w", err)
+		return fmt.Errorf("getting config: %w", err)
 	}
 	olderThan := cfg.Services.Secrets.UnrotatedOlderThan
 	if olderThan == 0 {
