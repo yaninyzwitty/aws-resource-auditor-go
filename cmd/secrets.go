@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/urfave/cli/v3"
+	"github.com/yaninyzwitty/aws-resource-auditor-go/internal/config"
 )
 
 func SecretsCommand() *cli.Command {
@@ -43,13 +44,13 @@ func secretsAction(ctx context.Context, cmd *cli.Command) error {
 	cfg, _ := ConfigFromContext(ctx)
 	olderThan := cfg.Services.Secrets.UnrotatedOlderThan
 	if olderThan == 0 {
-		olderThan = 90 * 24 * time.Hour
+		olderThan = config.Duration(90 * 24 * time.Hour)
 	}
 
 	var results []string
 
 	if unrotated {
-		secrets, err := findUnrotatedSecrets(ctx, secretsClient, olderThan)
+		secrets, err := findUnrotatedSecrets(ctx, secretsClient, olderThan.Duration())
 		if err != nil {
 			fmt.Printf("Error finding unrotated secrets: %v\n", err)
 		}
