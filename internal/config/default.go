@@ -17,7 +17,7 @@ func Default() *Config {
 		},
 
 		Thresholds: ThresholdConfig{
-			OlderThan:    90 * 24 * time.Hour,
+			OlderThan:    Duration(90 * 24 * time.Hour),
 			CPUThreshold: 20,
 		},
 

@@ -86,7 +86,7 @@ func ec2Action(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		if unused {
-			instances, err := findUnusedInstances(ctx, client, cfg.Thresholds.OlderThan)
+			instances, err := findUnusedInstances(ctx, client, cfg.Thresholds.OlderThan.Duration())
 			if err != nil {
 				fmt.Printf("Error finding unused instances: %v\n", err)
 			}
@@ -94,7 +94,7 @@ func ec2Action(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		if oldAmis {
-			amis, err := findOldAMIs(ctx, client, cfg.Services.EC2.OldAMIsOlderThan)
+			amis, err := findOldAMIs(ctx, client, cfg.Services.EC2.OldAMIsOlderThan.Duration())
 			if err != nil {
 				fmt.Printf("Error finding old AMIs: %v\n", err)
 			}

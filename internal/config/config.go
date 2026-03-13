@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"go.yaml.in/yaml/v3"
 )
 
 type Option func(*Config)
@@ -38,10 +40,37 @@ type FilterConfig struct {
 	Tags     map[string]string `yaml:"tags"`
 }
 
+type Duration time.Duration
+
+func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
+	var s string
+	if err := value.Decode(&s); err != nil {
+		return err
+	}
+	if s == "" {
+		*d = 0
+		return nil
+	}
+	parsed, err := ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	*d = Duration(parsed)
+	return nil
+}
+
+func (d Duration) Duration() time.Duration {
+	return time.Duration(d)
+}
+
+func (d Duration) Int64() int64 {
+	return int64(d)
+}
+
 type ThresholdConfig struct {
-	OlderThan time.Duration `yaml:"older_than"`
-	Days      int           `yaml:"days"`
-	Last      string        `yaml:"last"`
+	OlderThan Duration `yaml:"older_than"`
+	Days      int      `yaml:"days"`
+	Last      string   `yaml:"last"`
 
 	CPUThreshold float64 `yaml:"cpu_threshold"`
 	ErrorRate    float64 `yaml:"error_rate"`
@@ -74,30 +103,30 @@ type ServiceConfig struct {
 }
 
 type EC2Config struct {
-	UnusedOlderThan  time.Duration `yaml:"unused_older_than"`
-	OldAMIsOlderThan time.Duration `yaml:"old_amis_older_than"`
-	CPUThreshold     float64       `yaml:"cpu_threshold"`
+	UnusedOlderThan  Duration `yaml:"unused_older_than"`
+	OldAMIsOlderThan Duration `yaml:"old_amis_older_than"`
+	CPUThreshold     float64  `yaml:"cpu_threshold"`
 }
 
 type EBSConfig struct {
-	OldSnapshotsOlderThan time.Duration `yaml:"old_snapshots_older_than"`
+	OldSnapshotsOlderThan Duration `yaml:"old_snapshots_older_than"`
 }
 
 type S3Config struct{}
 
 type IAMConfig struct {
-	StaleKeysOlderThan   time.Duration `yaml:"stale_keys_older_than"`
-	UnusedRolesOlderThan time.Duration `yaml:"unused_roles_older_than"`
+	StaleKeysOlderThan   Duration `yaml:"stale_keys_older_than"`
+	UnusedRolesOlderThan Duration `yaml:"unused_roles_older_than"`
 }
 
 type SecretsConfig struct {
-	UnusedOlderThan    time.Duration `yaml:"unused_older_than"`
-	UnrotatedOlderThan time.Duration `yaml:"unrotated_older_than"`
+	UnusedOlderThan    Duration `yaml:"unused_older_than"`
+	UnrotatedOlderThan Duration `yaml:"unrotated_older_than"`
 }
 
 type LambdaConfig struct {
-	NeverInvokedOlderThan  time.Duration `yaml:"never_invoked_older_than"`
-	HighErrorRateThreshold float64       `yaml:"high_error_rate_threshold"`
+	NeverInvokedOlderThan  Duration `yaml:"never_invoked_older_than"`
+	HighErrorRateThreshold float64  `yaml:"high_error_rate_threshold"`
 }
 
 type RDSConfig struct {
@@ -142,7 +171,7 @@ func WithOutput(format string) Option {
 
 func WithOlderThan(d time.Duration) Option {
 	return func(c *Config) {
-		c.Thresholds.OlderThan = d
+		c.Thresholds.OlderThan = Duration(d)
 	}
 }
 
@@ -192,6 +221,9 @@ func ParseDuration(s string) (time.Duration, error) {
 		_, err := fmt.Sscanf(strings.TrimSuffix(s, "d"), "%d", &days)
 		if err != nil {
 			return 0, err
+		}
+		if days < 0 {
+			return 0, fmt.Errorf("duration days cannot be negative, %d", days)
 		}
 
 		return time.Duration(days) * 24 * time.Hour, nil

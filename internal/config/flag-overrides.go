@@ -86,7 +86,7 @@ func (c *Config) MergeFlags(f FlagOverrides) {
 	}
 
 	if f.OlderThan != 0 {
-		c.Thresholds.OlderThan = f.OlderThan
+		c.Thresholds.OlderThan = Duration(f.OlderThan)
 	}
 
 	if f.Days != 0 {

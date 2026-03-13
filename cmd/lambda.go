@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/urfave/cli/v3"
+	"github.com/yaninyzwitty/aws-resource-auditor-go/internal/config"
 )
 
 const (
@@ -65,7 +66,7 @@ func lambdaAction(ctx context.Context, cmd *cli.Command) error {
 
 	olderThan := cfg.Thresholds.OlderThan
 	if olderThan == 0 {
-		olderThan = 90 * 24 * time.Hour
+		olderThan = config.Duration(90 * 24 * time.Hour)
 	}
 
 	var results []string
@@ -87,7 +88,7 @@ func lambdaAction(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		if oldFunctions {
-			functions, err := findOldFunctions(ctx, client, olderThan)
+			functions, err := findOldFunctions(ctx, client, olderThan.Duration())
 			if err != nil {
 				fmt.Printf("Error finding old functions: %v\n", err)
 			}

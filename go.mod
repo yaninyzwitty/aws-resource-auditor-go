@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/rds v1.116.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.4
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.3
+	github.com/aws/aws-sdk-go-v2/service/sts v1.41.8
 	github.com/urfave/cli/v3 v3.7.0
 	go.yaml.in/yaml/v3 v3.0.4
 )
@@ -30,6 +31,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.12 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.16 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.41.8 // indirect
 	github.com/aws/smithy-go v1.24.2 // indirect
 )
