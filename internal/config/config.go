@@ -222,6 +222,9 @@ func ParseDuration(s string) (time.Duration, error) {
 		if err != nil {
 			return 0, err
 		}
+		if days < 0 {
+			return 0, fmt.Errorf("duration days cannot be negative, %d", days)
+		}
 
 		return time.Duration(days) * 24 * time.Hour, nil
 	}

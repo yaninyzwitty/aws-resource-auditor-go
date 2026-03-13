@@ -41,7 +41,10 @@ func secretsAction(ctx context.Context, cmd *cli.Command) error {
 		unrotated = true
 	}
 
-	cfg, _ := ConfigFromContext(ctx)
+	cfg, err := ConfigFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("getting config %w", err)
+	}
 	olderThan := cfg.Services.Secrets.UnrotatedOlderThan
 	if olderThan == 0 {
 		olderThan = config.Duration(90 * 24 * time.Hour)
